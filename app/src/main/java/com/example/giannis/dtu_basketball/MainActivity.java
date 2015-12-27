@@ -7,6 +7,7 @@ import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -21,15 +22,21 @@ import java.util.TimerTask;
 public class MainActivity extends AppCompatActivity {
 
     public final static String EXTRA_MESSAGE = "com.example.giannis.dtu_basketball.MESSAGE";
-    private MalibuCountDownTimer countDownTimer;
-    private long timeElapsed;
+    private MalibuCountDownTimer quarterTimer;
+    private long timeRemaining;
     private boolean timerHasStarted = false;
-    private Button startB;
+    private Button startButton,stopButton,restartButton;
     private TextView text;
     private TextView timeElapsedView;
-
-    private final long startTime = 50000;
+    //Declare a variable to hold count down timer's paused status
+    private boolean isPaused = false;
+    private boolean isCancelled= false;
+    //10 min
+    private final long gameDuration = 600000;
     private final long interval = 1000;
+    final long MINUTES_IN_AN_HOUR = 60000;
+    final long MILLISECONDS_IN_A_MINUTE = 60000;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,11 +54,43 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         timeElapsedView = (TextView) this.findViewById(R.id.timeElapsed);
-        countDownTimer = new MalibuCountDownTimer(startTime, interval);
-        countDownTimer.start();
-        timerHasStarted = true;
-    }
+        startButton=(Button) this.findViewById(R.id.buttonStart);
+        stopButton=(Button) this.findViewById(R.id.buttonStop);
+        restartButton=(Button) this.findViewById(R.id.buttonRestart);
 
+    }
+    public void onStart(View view) {
+        Log.i("onStart", "Start");
+
+        startButton.setVisibility(View.INVISIBLE);
+        stopButton.setVisibility(View.VISIBLE);
+        //Initialize a new CountDownTimer instance
+        if (isPaused && !isCancelled) {
+            // Continue counting down.
+            quarterTimer = new MalibuCountDownTimer(timeRemaining, interval);
+        }
+        else {
+            // Create new counter.
+            quarterTimer = new MalibuCountDownTimer(gameDuration, interval);
+        }
+        quarterTimer.start();
+        isPaused = false;
+        isCancelled = false;
+    }
+    public void onStop(View view) {
+        Log.i("onStop", "Stop");
+        startButton.setVisibility(View.VISIBLE);
+        stopButton.setVisibility(View.INVISIBLE);
+        isPaused = true;
+    }
+    public void onRestart(View view) {
+        Log.i("onRestart", "Restart");
+        startButton.setVisibility(View.VISIBLE);
+        stopButton.setVisibility(View.INVISIBLE);
+        // Restart timer
+        timeElapsedView.setText("Countdown:" + timeConversion(gameDuration));
+        isCancelled = true;
+    }
     // CountDownTimer class
     public class MalibuCountDownTimer extends CountDownTimer
     {
@@ -64,14 +103,34 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onFinish()
         {
-            timeElapsedView.setText("Time Elapsed: " + String.valueOf(startTime));
+            timeElapsedView.setText("Quarter Finished!");
         }
 
         @Override
         public void onTick(long millisUntilFinished)
         {
-            timeElapsed = startTime - millisUntilFinished;
-            timeElapsedView.setText("Time Elapsed: " + String.valueOf(timeElapsed));
+            //Do something in every tick
+            if (isPaused)
+            {
+                Log.i("Paused:", Long.toString(millisUntilFinished));
+                //If user requested to pause or cancel the count down timer
+                timeElapsedView.setText("Stopped at:" + timeConversion(timeRemaining));
+                timeRemaining = millisUntilFinished;
+                cancel();
+            }
+            else if(isCancelled) {
+                Log.i("Paused:", Long.toString(millisUntilFinished));
+                //If user requested to pause or cancel the count down timer
+                timeElapsedView.setText("Stopped at:" + timeConversion(timeRemaining));
+                timeRemaining = millisUntilFinished;
+                cancel();
+            }
+            else {
+                Log.i("onTick2:", Long.toString(millisUntilFinished));
+                timeElapsedView.setText("Countdown: " + timeConversion(timeRemaining));
+                timeRemaining = millisUntilFinished;
+
+            }
         }
     }
 
@@ -97,6 +156,12 @@ public class MainActivity extends AppCompatActivity {
 
         return super.onOptionsItemSelected(item);
     }
+    private String timeConversion(long milliseconds) {
 
+        long seconds = milliseconds % MILLISECONDS_IN_A_MINUTE;
+        long totalMinutes = milliseconds/ MILLISECONDS_IN_A_MINUTE;
+        long minutes = totalMinutes % MINUTES_IN_AN_HOUR;
 
+        return minutes + "\'" + seconds + "\"";
+    }
 }

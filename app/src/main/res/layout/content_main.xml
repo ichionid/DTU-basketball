@@ -17,27 +17,33 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/start_time"
-        android:onClick="sendMessage"
-        android:id="@+id/button" />
+        android:onClick="onStart"
+        android:id="@+id/buttonStart" />
     <Button
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/stop_time"
-        android:onClick="sendMessage"
-        android:layout_alignTop="@+id/button"
-        android:layout_toRightOf="@+id/button"
-        android:layout_toEndOf="@+id/button"
-        android:id="@+id/button2" />
+        android:onClick="onStop"
+        android:visibility="invisible"
+        android:id="@+id/buttonStop" />
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/restart_time"
+        android:onClick="onRestart"
+        android:layout_alignTop="@+id/buttonStart"
+        android:layout_toRightOf="@+id/buttonStart"
+        android:layout_toEndOf="@+id/buttonStart"
+        android:id="@+id/buttonRestart" />
     <TextView
         android:id="@+id/timeElapsed"
         android:text="Time elapsed: "
         android:paddingRight="10dip"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignTop="@+id/button2"
-        android:layout_toRightOf="@+id/button2"
-        android:layout_toEndOf="@+id/button2" />
-
+        android:layout_alignTop="@+id/buttonRestart"
+        android:layout_toRightOf="@+id/buttonRestart"
+        android:layout_toEndOf="@+id/buttonRestart" />
     <Button
         style="?android:attr/buttonStyleSmall"
         android:layout_width="120dp"
