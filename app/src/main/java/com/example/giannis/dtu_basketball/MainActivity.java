@@ -1,6 +1,7 @@
 package com.example.giannis.dtu_basketball;
 
-import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.PorterDuff;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.support.design.widget.FloatingActionButton;
@@ -12,17 +13,18 @@ import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.TextView;
 
-import java.util.Calendar;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
 
 public class MainActivity extends AppCompatActivity {
-    public final static String EXTRA_MESSAGE = "com.example.giannis.dtu_basketball.MESSAGE";
     private MalibuCountDownTimer quarterTimer;
     private long timeRemaining;
     private Button startButton,stopButton,p1Button,p2Button,p3Button,p4Button,p5Button,p6Button,p7Button,p8Button,p9Button,p10Button,p11Button,p12Button;
@@ -35,8 +37,13 @@ public class MainActivity extends AppCompatActivity {
     private final long interval = 1000;
     final long MINUTES_IN_AN_HOUR = 60;
     final long MILLISECONDS_IN_A_MINUTE = 60000;
-    // Players/Team
+    // Create necessary data structures, team,subs and active squad.
+    ArrayList<Sub> subs= new ArrayList<Sub>();
     Map<Integer,Player> teamMap = new HashMap<Integer,Player>();
+    ArrayList<ActiveSquad> activeSquads = new ArrayList<ActiveSquad>();
+    // activeSquads will always keep a copy of the current activeSquad on top.
+    private ActiveSquad activeSquad;
+    // activeSquad will always keep the active squad live.
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -56,8 +63,9 @@ public class MainActivity extends AppCompatActivity {
         initializePlayers();
 
         timeElapsedView = (TextView) this.findViewById(R.id.timeElapsed);
-        startButton=(Button) this.findViewById(R.id.buttonStart);
-        stopButton=(Button) this.findViewById(R.id.buttonStop);
+        startButton = (Button) this.findViewById(R.id.buttonStart);
+        stopButton = (Button) this.findViewById(R.id.buttonStop);
+        activeSquad = new ActiveSquad();
     }
     // Initialize the team.
     private void initializePlayers() {
@@ -66,28 +74,119 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void onPlayerClick(View view) {
+    public void onPlayerClick(View view) {
         // @todo implement logic here. Toggle players according to the isPlaying parameter.
-    }
+        Button b = (Button)view;
+        Integer playerNumber = Integer.parseInt(b.getText().toString());
+        Player p = teamMap.get(playerNumber);
 
-    public void onStart(View view) {
-        Log.i("onStart", "Start");
+        if (p.isPlaying()) {
+           // Sub player out.
+            b.getBackground().setColorFilter(Color.parseColor("#d3d3d3"), PorterDuff.Mode.MULTIPLY);
+            p.setPlaying(false);
+            p.getTimeEnteredCourt();
+            // Register sub with time stamp
+            Sub s = new Sub();
+            s.setTimeSubedIn(p.getTimeEnteredCourt());
+            s.setTimeSubedOut(timeRemaining);
+            subs.add(s);
+            // Remove from active squad.
 
-        startButton.setVisibility(View.INVISIBLE);
-        stopButton.setVisibility(View.VISIBLE);
-        //Initialize a new CountDownTimer instance
-        if (isPaused && !isCancelled) {
-            // Continue counting down.
-            quarterTimer = new MalibuCountDownTimer(timeRemaining, interval);
+            activeSquad.removePlayer(p.getNumber());
         }
         else {
-            // Create new counter.
-            quarterTimer = new MalibuCountDownTimer(gameDuration, interval);
+            // Sub player in
+            b.getBackground().setColorFilter(Color.parseColor("#009933"), PorterDuff.Mode.MULTIPLY);
+            p.setPlaying(true);
+            p.setTimeEnteredCourt(timeRemaining);
+            // Add to active squad
+            activeSquad.addPlayer(p);
         }
-        quarterTimer.start();
-        isPaused = false;
-        isCancelled = false;
     }
+
+    public void onStart(View view) throws CloneNotSupportedException {
+        Log.i("onStart", "Start");
+        // Start only if 5 players are available
+        if (activeSquad.getPlayers().size() == 5) {
+            Log.i("onStart", "5 players are registered!");
+            // Check is squad exists already
+            if (activeSquads.size()==0) {
+                Log.i("Starting squad", "!!!");
+                // Starting squad
+                activeSquad.setStartTime(timeRemaining);
+                // Active squad will also be stored at the active squads list
+                ActiveSquad clonedSquad = new ActiveSquad();
+                clonedSquad.cloneObject(activeSquad);
+                activeSquads.add(clonedSquad);
+            } else if(activeSquadIsNew()) {
+                Log.i("New squad", "!!!");
+                // New squad. Set the stop time in the old one and store it.
+                activeSquads.get(activeSquads.size() - 1).setStopTime(timeRemaining);
+                // Set new start time for the active squad.
+                activeSquad.setStopTime(timeRemaining);
+                // Add a copy of the new squad
+                ActiveSquad clonedSquad = new ActiveSquad();
+                clonedSquad.cloneObject(activeSquad);
+                activeSquads.add(clonedSquad);
+            }
+            printAllActiveSquads();
+            startButton.setVisibility(View.INVISIBLE);
+            stopButton.setVisibility(View.VISIBLE);
+            //Initialize a new CountDownTimer instance
+            if (isPaused && !isCancelled) {
+                // Continue counting down.
+                quarterTimer = new MalibuCountDownTimer(timeRemaining, interval);
+            }
+            else {
+                // Create new counter.
+                quarterTimer = new MalibuCountDownTimer(gameDuration, interval);
+            }
+            quarterTimer.start();
+            isPaused = false;
+            isCancelled = false;
+            // If we have 5 players we can register .
+        }
+    }
+
+    /**
+     * Function checking whether or not a squad on start time is new.
+     * @return boolean
+     */
+    private boolean activeSquadIsNew() {
+
+        ActiveSquad lastRegisteredSquad = activeSquads.get(activeSquads.size() - 1);
+        Map<Integer, Player> tempActiveSquadPlayers = activeSquad.getPlayers();
+        Map<Integer, Player> tempLastRegSquadPlayers = activeSquad.getPlayers();
+        // Check if all players are registered. If not return FALSE
+        for (Map.Entry<Integer, Player> entry : tempActiveSquadPlayers.entrySet()) {
+            Player tempP = tempLastRegSquadPlayers.get(entry.getKey());
+            if (tempP == null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Helper function.
+     */
+    private void printSquadPlayers(ActiveSquad as) {
+        for (Map.Entry<Integer, Player> entry : as.getPlayers().entrySet()) {
+            Log.i("ActivePlayer", entry.getKey().toString());
+        }
+    }
+    /**
+     * Helper function.
+     */
+    private void printAllActiveSquads() {
+        for(int i=0;i<activeSquads.size();i++) {
+            Log.i("Squad entered" + i +":", timeConversion(activeSquads.get(i).getStartTime()));
+            for (Map.Entry<Integer, Player> entry : activeSquads.get(i).getPlayers().entrySet()) {
+                Log.i("ActivePlayer", entry.getKey().toString());
+            }
+        }
+    }
+
     public void onStop(View view) {
         Log.i("onStop", "Stop");
         startButton.setVisibility(View.VISIBLE);
